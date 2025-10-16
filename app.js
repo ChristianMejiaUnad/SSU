@@ -1,4 +1,26 @@
 
+function solicitarPermisoNotificaciones() {
+  if ('Notification' in window && Notification.permission !== 'granted') {
+    Notification.requestPermission().then(permission => {
+      if (permission === 'granted') {
+        console.log('Permiso de notificaciones concedido.');
+      }
+    });
+  }
+}
+
+function enviarNotificacion(titulo, mensaje) {
+  if ('Notification' in window && Notification.permission === 'granted') {
+    new Notification(titulo, {
+      body: mensaje,
+      icon: 'icono.png'
+    });
+  }
+}
+
+solicitarPermisoNotificaciones();
+
+
 function mostrarRegistro() {
   document.getElementById('contenido').innerHTML = `
     <h2>Registro de Usuarios</h2>
@@ -71,9 +93,7 @@ function volverInicio() {
 }
 
 function salir() {
-  localStorage.clear();
-  alert('Datos borrados');
-  volverInicio();
+  mostrarOpcionesBorrado();
 }
 
 
@@ -191,3 +211,27 @@ function guardarReciclador() {
     alert('Reciclador guardado correctamente');
     volverInicio();
 }
+
+
+function mostrarOpcionesBorrado() {
+  document.getElementById('contenido').innerHTML = `
+    <h3>¿Qué desea borrar?</h3>
+    <button onclick="borrarUsuario()">Borrar Usuario</button>
+    <button onclick="borrarReciclaje()">Borrar Reciclaje</button>
+    <button onclick="volverInicio()">Cancelar</button>
+  `;
+}
+
+function borrarUsuario() {
+  localStorage.removeItem('hogar');
+  localStorage.removeItem('reciclador');
+  alert('Datos del usuario borrados');
+  volverInicio();
+}
+
+function borrarReciclaje() {
+  localStorage.removeItem('reportes');
+  alert('Datos de reciclaje borrados');
+  volverInicio();
+}
+

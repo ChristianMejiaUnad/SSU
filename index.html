@@ -1,18 +1,47 @@
 
 <!DOCTYPE html>
-<html lang="es">
+<html lang='es'>
 <head>
-    <meta charset="UTF-8">
-    <title>Reciclaje Conectado</title>
-    <script src="app.js"></script>
-    <link rel="manifest" href="manifest.json">
+  <meta charset='UTF-8'>
+  <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+  <title>Reciclaje-SSU</title>
+  <link rel='manifest' href='manifest.json'>
+  <script src='app.js'></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 20px;
+    }
+    button {
+      display: block;
+      width: 80%;
+      max-width: 300px;
+      margin: 10px auto;
+      padding: 12px;
+      font-size: 16px;
+      background-color: #F39200;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #005BAC;
+    }
+  </style>
 </head>
 <body>
-    <h1>Bienvenido</h1>
-    <button onclick="mostrarRegistro()">Registro de usuarios</button>
-    <button onclick="mostrarReporte()">Reporte de Reciclaje</button>
-    <button onclick="mostrarRecicladores()">Módulo de Recicladores</button>
-    <button onclick="salir()">Salir</button>
-    <div id="contenido"></div>
+  <h1>Reciclaje-SSU</h1>
+  <button onclick='mostrarRegistro()'>Registro de usuarios</button>
+  <button onclick='mostrarReporte()'>Reporte de Reciclaje</button>
+  <button onclick='mostrarRecicladores()'>Módulo de Recicladores</button>
+  <button onclick='salir()'>Borrar</button>
+  <div id='contenido'></div>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js');
+    }
+  </script>
 </body>
 </html>
