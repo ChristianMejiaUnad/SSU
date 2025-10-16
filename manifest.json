@@ -1,0 +1,10 @@
+
+{
+  "name": "Reciclaje Conectado",
+  "short_name": "Reciclaje",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "description": "App para conectar hogares con recicladores",
+  "icons": []
+}
