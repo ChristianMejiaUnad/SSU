@@ -11,26 +11,18 @@ self.addEventListener('install', function(e) {
   );
 });
 
+self.addEventListener('activate', function(e) {
+  e.waitUntil(
+    caches.keys().then(function(keys) {
+      return Promise.all(keys.filter(k => k !== 'reciclaje-store').map(k => caches.delete(k)));
+    })
+  );
+});
+
 self.addEventListener('fetch', function(e) {
   e.respondWith(
     caches.match(e.request).then(function(response) {
       return response || fetch(e.request);
     })
   );
-});
-
-self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== 'reciclaje-store').map(k => caches.delete(k)))
-    )
-  );
-});
-
-self.addEventListener('push', function(event) {
-  const data = event.data.json();
-  self.registration.showNotification(data.title, {
-    body: data.body,
-    icon: 'icono.png'
-  });
 });

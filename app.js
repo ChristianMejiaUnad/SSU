@@ -1,24 +1,14 @@
-function solicitarPermisoNotificaciones() {
-  if ('Notification' in window && Notification.permission !== 'granted') {
-    Notification.requestPermission().then(permission => {
-      if (permission === 'granted') {
-        console.log('Permiso de notificaciones concedido.');
-      }
-    });
-  }
+// app.js - usa Firestore (db expuesto en window.db)
+
+const db = window.db;
+
+// Guardamos solo los IDs de documento localmente para asociar sesión (no datos)
+function setLocalId(key, id) {
+  try { localStorage.setItem(key, id); } catch(e) { console.warn(e); }
 }
-
-function enviarNotificacion(titulo, mensaje) {
-  if ('Notification' in window && Notification.permission === 'granted') {
-    new Notification(titulo, {
-      body: mensaje,
-      icon: 'icono.png'
-    });
-  }
+function getLocalId(key) {
+  try { return localStorage.getItem(key); } catch(e) { return null; }
 }
-
-solicitarPermisoNotificaciones();
-
 
 function mostrarRegistro() {
   document.getElementById('contenido').innerHTML = `
@@ -29,188 +19,218 @@ function mostrarRegistro() {
   `;
 }
 
-function registroHogar() {
-  let hogar = JSON.parse(localStorage.getItem('hogar'));
-  if (hogar) {
-    document.getElementById('contenido').innerHTML = `
-      <h3>Datos del Hogar</h3>
-      Dirección: <input id='direccion' value='${hogar.direccion}'><br>
-      Barrio: <input id='barrio' value='${hogar.barrio}'><br>
-      <button onclick="guardarHogar()">Guardar</button>
-      <button onclick="volverInicio()">Volver</button>
-    `;
-  } else {
-    document.getElementById('contenido').innerHTML = `
-      <h3>Registro de Hogar</h3>
-      Dirección: <input id='direccion'><br>
-      Barrio: <input id='barrio'><br>
-      <button onclick="guardarHogar()">Guardar</button>
-      <button onclick="volverInicio()">Volver</button>
-    `;
+async function registroHogar() {
+  const hogarId = getLocalId('hogarId');
+  let hogarData = null;
+  if (hogarId) {
+    try {
+      const doc = await db.collection('hogares').doc(hogarId).get();
+      if (doc.exists) hogarData = doc.data();
+    } catch(e) {
+      console.error('Error leyendo hogar', e);
+    }
   }
-}
-
-function guardarHogar() {
-  const direccion = document.getElementById('direccion').value.trim();
-  const barrio = document.getElementById('barrio').value.trim();
-  if (!direccion || !barrio) {
-    alert('Por favor completa todos los campos');
-    return;
-  }
-  localStorage.setItem('hogar', JSON.stringify({ direccion, barrio }));
-  alert('Datos guardados');
-  volverInicio();
-}
-
-
-function registroReciclador() {
-  let reciclador = JSON.parse(localStorage.getItem('reciclador'));
-  const tipos = ["Vidrio", "Plástico", "Metales", "De cocina", "Otros"];
-  let tiposSeleccionados = Array.isArray(reciclador?.tipos) ? reciclador.tipos : [];
-  let checkboxes = tipos.map(tipo => {
-    let checked = tiposSeleccionados.includes(tipo) ? "checked" : "";
-    return `<label><input type='checkbox' name='tipos' value='${tipo}' ${checked}> ${tipo}</label><br>`;
-  }).join("");
 
   document.getElementById('contenido').innerHTML = `
-    <h3>Registro de Reciclador</h3>
-    Empresa: <input id='empresa' value='${reciclador?.empresa || ""}'><br>
-    Responsable: <input id='responsable' value='${reciclador?.responsable || ""}'><br>
-    Dirección: <input id='direccionReciclador' value='${reciclador?.direccion || ""}'><br>
-    Celular: <input id='celular' value='${reciclador?.celular || ""}'><br>
-    Tipos de reciclaje:<br>
-    ${checkboxes}
-    <button onclick='guardarReciclador()'>Guardar</button>
-    <button onclick='volverInicio()'>Volver</button>
+    <h3>${hogarData ? 'Datos del Hogar' : 'Registro de Hogar'}</h3>
+    Dirección: <input id="direccion" value="${hogarData ? hogarData.direccion : ''}"><br>
+    Barrio: <input id="barrio" value="${hogarData ? hogarData.barrio : ''}"><br>
+    <button onclick="guardarHogar()">Guardar</button>
+    <button onclick="volverInicio()">Volver</button>
   `;
 }
 
-function guardarReciclador() {
+async function guardarHogar() {
+  const direccion = document.getElementById('direccion').value.trim();
+  const barrio = document.getElementById('barrio').value.trim();
+  if (!direccion || !barrio) { alert('Por favor completa todos los campos'); return; }
+
+  const hogarId = getLocalId('hogarId');
+  try {
+    if (hogarId) {
+      await db.collection('hogares').doc(hogarId).set({ direccion, barrio }, { merge: true });
+      alert('Hogar actualizado en la nube');
+    } else {
+      const ref = await db.collection('hogares').add({ direccion, barrio, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+      setLocalId('hogarId', ref.id);
+      alert('Hogar registrado en la nube');
+    }
+    volverInicio();
+  } catch (e) {
+    console.error('Error guardando hogar', e);
+    alert('Error guardando datos en la nube');
+  }
+}
+
+async function registroReciclador() {
+  const recicladorId = getLocalId('recicladorId');
+  let recicladorData = null;
+  if (recicladorId) {
+    try {
+      const doc = await db.collection('recicladores').doc(recicladorId).get();
+      if (doc.exists) recicladorData = doc.data();
+    } catch(e) { console.error(e); }
+  }
+
+  const tipos = ["Vidrio", "Plástico", "Metales", "De cocina", "Otros"];
+  const tiposSeleccionados = recicladorData?.tipos || [];
+  const checkboxes = tipos.map(t => {
+    const checked = tiposSeleccionados.includes(t) ? 'checked' : '';
+    return `<label><input type="checkbox" name="tipos" value="${t}" ${checked}> ${t}</label><br>`;
+  }).join('');
+
+  document.getElementById('contenido').innerHTML = `
+    <h3>${recicladorData ? 'Datos del Reciclador' : 'Registro de Reciclador'}</h3>
+    Empresa: <input id="empresa" value="${recicladorData?.empresa || ''}"><br>
+    Responsable: <input id="responsable" value="${recicladorData?.responsable || ''}"><br>
+    Dirección: <input id="direccionReciclador" value="${recicladorData?.direccion || ''}"><br>
+    Celular: <input id="celular" value="${recicladorData?.celular || ''}"><br>
+    Tipos de reciclaje:<br>
+    ${checkboxes}
+    <button onclick="guardarReciclador()">Guardar</button>
+    <button onclick="volverInicio()">Volver</button>
+  `;
+}
+
+async function guardarReciclador() {
   const empresa = document.getElementById('empresa').value.trim();
   const responsable = document.getElementById('responsable').value.trim();
   const direccion = document.getElementById('direccionReciclador').value.trim();
   const celular = document.getElementById('celular').value.trim();
-  const tipos = Array.from(document.querySelectorAll("input[name='tipos']:checked")).map(el => el.value);
+  const tipos = Array.from(document.querySelectorAll('input[name="tipos"]:checked')).map(el => el.value);
+  if (!empresa || !responsable || !direccion || !celular) { alert('Por favor completa todos los campos'); return; }
 
-  if (!empresa || !responsable || !direccion || !celular) {
-    alert("Por favor completa todos los campos");
-    return;
+  const recicladorId = getLocalId('recicladorId');
+  try {
+    if (recicladorId) {
+      await db.collection('recicladores').doc(recicladorId).set({ empresa, responsable, direccion, celular, tipos }, { merge: true });
+      alert('Reciclador actualizado en la nube');
+    } else {
+      const ref = await db.collection('recicladores').add({ empresa, responsable, direccion, celular, tipos, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+      setLocalId('recicladorId', ref.id);
+      alert('Reciclador registrado en la nube');
+    }
+    volverInicio();
+  } catch(e) {
+    console.error('Error guardando reciclador', e);
+    alert('Error guardando datos en la nube');
   }
-
-  const reciclador = { empresa, responsable, direccion, celular, tipos };
-  localStorage.setItem('reciclador', JSON.stringify(reciclador));
-  alert('Reciclador guardado correctamente');
-  volverInicio();
 }
 
-
-function mostrarReporte() {
-  let hogar = JSON.parse(localStorage.getItem('hogar'));
-  if (!hogar) {
-    alert('Debe registrar primero el hogar');
+async function mostrarReporte() {
+  const hogarId = getLocalId('hogarId');
+  if (!hogarId) {
+    alert('Debe registrar primero el hogar (se guarda en la nube).');
     registroHogar();
     return;
   }
 
   const tipos = ["Vidrio", "Plástico", "Metales", "De cocina", "Otros"];
-  let checkboxes = tipos.map(tipo => `<label><input type='checkbox' name='tipos' value='${tipo}'> ${tipo}</label><br>`).join("");
+  const checkboxes = tipos.map(tipo => `<label><input type="checkbox" name="tipos" value="${tipo}"> ${tipo}</label><br>`).join('');
 
   document.getElementById('contenido').innerHTML = `
     <h3>Reporte de Reciclaje</h3>
     Tipos de reciclaje:<br>
     ${checkboxes}
     Cantidad:<br>
-    <select id='cantidad'>
-      <option value='Pequeño'>Pequeño (&lt;5kg)</option>
-      <option value='Mediano'>Mediano (5–20kg)</option>
-      <option value='Grande'>Grande (&gt;20kg)</option>
+    <select id="cantidad">
+      <option value="Pequeño">Pequeño (&lt;5kg)</option>
+      <option value="Mediano">Mediano (5–20kg)</option>
+      <option value="Grande">Grande (&gt;20kg)</option>
     </select><br>
     Día:<br>
-    <select id='dia'>
-      <option>Lunes</option>
-      <option>Martes</option>
-      <option>Miércoles</option>
-      <option>Jueves</option>
-      <option>Viernes</option>
-      <option>Sábado</option>
-      <option>Domingo</option>
+    <select id="dia">
+      <option>Lunes</option><option>Martes</option><option>Miércoles</option>
+      <option>Jueves</option><option>Viernes</option><option>Sábado</option><option>Domingo</option>
     </select><br>
-    Hora (24h): <input id='hora' type='time'><br>
-    <button onclick='guardarReporte()'>Terminar</button>
-    <button onclick='volverInicio()'>Volver</button>
+    Hora (24h): <input id="hora" type="time"><br>
+    <button onclick="guardarReporte()">Terminar</button>
+    <button onclick="volverInicio()">Volver</button>
   `;
 }
 
-function guardarReporte() {
-  const tipos = Array.from(document.querySelectorAll("input[name='tipos']:checked")).map(el => el.value);
+async function guardarReporte() {
+  const tipos = Array.from(document.querySelectorAll('input[name="tipos"]:checked')).map(el => el.value);
   const cantidad = document.getElementById('cantidad').value;
   const dia = document.getElementById('dia').value;
   const hora = document.getElementById('hora').value;
-  const hogar = JSON.parse(localStorage.getItem('hogar')) || {};
+  const hogarId = getLocalId('hogarId');
 
-  let reportes = JSON.parse(localStorage.getItem('reportes')) || [];
-  reportes.push({
-    barrio: hogar.barrio || "-",
-    direccion: hogar.direccion || "-",
-    tipos,
-    cantidad,
-    dia,
-    hora
-  });
-  localStorage.setItem('reportes', JSON.stringify(reportes));
+  if (!hogarId) { alert('No se encontró un hogar asociado. Registra un hogar primero.'); return; }
 
-  alert('Reporte guardado');
-  volverInicio();
-}
-
-
-function mostrarRecicladores() {
-  const reciclajes = JSON.parse(localStorage.getItem("reportes")) || [];
-  let html = `<h2>Reportes de Reciclaje</h2>`;
-
-  if (reciclajes.length === 0) {
-    html += `<p>No hay reportes disponibles.</p>`;
-  } else {
-    html += `<table border='1'>
-      <tr>
-        <th>Barrio</th>
-        <th>Dirección</th>
-        <th>Tipo</th>
-        <th>Cantidad</th>
-        <th>Día</th>
-        <th>Hora</th>
-        <th>Acción</th>
-      </tr>`;
-    reciclajes.forEach((r, index) => {
-      html += `<tr>
-        <td>${r.barrio || "-"}</td>
-        <td>${r.direccion || "-"}</td>
-        <td>${(r.tipos && r.tipos.join(", ")) || "-"}</td>
-        <td>${r.cantidad || "-"}</td>
-        <td>${r.dia || "-"}</td>
-        <td>${r.hora || "-"}</td>
-        <td>
-          <button onclick='marcarRecogido(${index})'
-            style='background-color: orange; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; min-width: 90px; white-space: nowrap; font-size: 14px;'>
-            Recogido
-          </button>
-        </td>
-      </tr>`;
+  try {
+    await db.collection('reportes').add({
+      hogarId: hogarId,
+      tipos,
+      cantidad,
+      dia,
+      hora,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
-    html += `</table>`;
+    alert('Reporte guardado en la nube');
+    volverInicio();
+  } catch(e) {
+    console.error('Error guardando reporte', e);
+    alert('Error guardando reporte en la nube');
   }
-
-  html += `<br><button onclick='volverInicio()'>Volver</button>`;
-  document.getElementById("contenido").innerHTML = html;
 }
 
-function marcarRecogido(index) {
-  let reciclajes = JSON.parse(localStorage.getItem("reportes")) || [];
-  reciclajes.splice(index, 1);
-  localStorage.setItem("reportes", JSON.stringify(reciclajes));
-  mostrarRecicladores();
+async function mostrarRecicladores() {
+  let html = `<h2>Reportes de Reciclaje</h2>`;
+  try {
+    const snapshot = await db.collection('reportes').orderBy('createdAt', 'desc').get();
+    if (snapshot.empty) {
+      html += `<p>No hay reportes disponibles.</p>`;
+    } else {
+      html += `<table>
+        <tr><th>Barrio</th><th>Dirección</th><th>Tipo</th><th>Cantidad</th><th>Día</th><th>Hora</th><th>Acción</th></tr>`;
+      for (const doc of snapshot.docs) {
+        const r = doc.data();
+        // Obtener datos del hogar si existe
+        let barrio = '-';
+        let direccion = '-';
+        if (r.hogarId) {
+          try {
+            const hdoc = await db.collection('hogares').doc(r.hogarId).get();
+            if (hdoc.exists) {
+              const h = hdoc.data();
+              barrio = h.barrio || '-';
+              direccion = h.direccion || '-';
+            }
+          } catch(e) { console.error('Error leyendo hogar para reporte', e); }
+        }
+        const tipos = (r.tipos && r.tipos.join(', ')) || '-';
+        html += `<tr>
+          <td>${barrio}</td>
+          <td>${direccion}</td>
+          <td>${tipos}</td>
+          <td>${r.cantidad || '-'}</td>
+          <td>${r.dia || '-'}</td>
+          <td>${r.hora || '-'}</td>
+          <td><button onclick="marcarRecogido('${doc.id}')"
+            style="background-color: orange; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; min-width: 90px; white-space: nowrap; font-size: 14px;">
+            Recogido</button></td>
+        </tr>`;
+      }
+      html += `</table>`;
+    }
+  } catch(e) {
+    console.error('Error cargando reportes', e);
+    html += `<p>Error cargando reportes.</p>`;
+  }
+  html += `<br><button onclick="volverInicio()">Volver</button>`;
+  document.getElementById('contenido').innerHTML = html;
 }
 
+async function marcarRecogido(id) {
+  try {
+    await db.collection('reportes').doc(id).delete();
+    mostrarRecicladores();
+  } catch(e) {
+    console.error('Error borrando reporte', e);
+    alert('No se pudo marcar como recogido');
+  }
+}
 
 function mostrarOpcionesBorrado() {
   document.getElementById('contenido').innerHTML = `
@@ -221,23 +241,35 @@ function mostrarOpcionesBorrado() {
   `;
 }
 
-function borrarUsuario() {
-  localStorage.removeItem('hogar');
-  localStorage.removeItem('reciclador');
-  alert('Datos del usuario borrados');
+async function borrarUsuario() {
+  const hogarId = getLocalId('hogarId');
+  const recicladorId = getLocalId('recicladorId');
+  try {
+    if (hogarId) await db.collection('hogares').doc(hogarId).delete();
+    if (recicladorId) await db.collection('recicladores').doc(recicladorId).delete();
+  } catch(e) {
+    console.error('Error borrando usuario en la nube', e);
+  }
+  try { localStorage.removeItem('hogarId'); localStorage.removeItem('recicladorId'); } catch(e){}
+  alert('Datos del usuario borrados (nube + local)');
   volverInicio();
 }
 
-function borrarReciclaje() {
-  localStorage.removeItem('reportes');
-  alert('Datos de reciclaje borrados');
-  volverInicio();
+async function borrarReciclaje() {
+  // Borrar todos los reportes (precaución)
+  if (!confirm('¿Confirma borrar todos los reportes en la nube?')) return;
+  try {
+    const snapshot = await db.collection('reportes').get();
+    const batch = db.batch();
+    snapshot.forEach(doc => batch.delete(doc.ref));
+    await batch.commit();
+    alert('Todos los reportes borrados');
+    volverInicio();
+  } catch(e) {
+    console.error('Error borrando reportes', e);
+    alert('No se pudieron borrar los reportes');
+  }
 }
 
-function volverInicio() {
-  document.getElementById('contenido').innerHTML = '';
-}
-
-function salir() {
-  mostrarOpcionesBorrado();
-}
+function volverInicio() { document.getElementById('contenido').innerHTML = ''; }
+function salir() { mostrarOpcionesBorrado(); }
