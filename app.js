@@ -1,4 +1,3 @@
-
 function solicitarPermisoNotificaciones() {
   if ('Notification' in window && Notification.permission !== 'granted') {
     Notification.requestPermission().then(permission => {
@@ -52,8 +51,12 @@ function registroHogar() {
 }
 
 function guardarHogar() {
-  const direccion = document.getElementById('direccion').value;
-  const barrio = document.getElementById('barrio').value;
+  const direccion = document.getElementById('direccion').value.trim();
+  const barrio = document.getElementById('barrio').value.trim();
+  if (!direccion || !barrio) {
+    alert('Por favor completa todos los campos');
+    return;
+  }
   localStorage.setItem('hogar', JSON.stringify({ direccion, barrio }));
   alert('Datos guardados');
   volverInicio();
@@ -73,7 +76,7 @@ function registroReciclador() {
     <h3>Registro de Reciclador</h3>
     Empresa: <input id='empresa' value='${reciclador?.empresa || ""}'><br>
     Responsable: <input id='responsable' value='${reciclador?.responsable || ""}'><br>
-    Dirección: <input id='direccion' value='${reciclador?.direccion || ""}'><br>
+    Dirección: <input id='direccionReciclador' value='${reciclador?.direccion || ""}'><br>
     Celular: <input id='celular' value='${reciclador?.celular || ""}'><br>
     Tipos de reciclaje:<br>
     ${checkboxes}
@@ -81,19 +84,23 @@ function registroReciclador() {
     <button onclick='volverInicio()'>Volver</button>
   `;
 }
-function recoger(index) {
-  let reportes = JSON.parse(localStorage.getItem('reportes')) || [];
-  reportes.splice(index, 1);
-  localStorage.setItem('reportes', JSON.stringify(reportes));
-  mostrarRecicladores();
-}
 
-function volverInicio() {
-  document.getElementById('contenido').innerHTML = '';
-}
+function guardarReciclador() {
+  const empresa = document.getElementById('empresa').value.trim();
+  const responsable = document.getElementById('responsable').value.trim();
+  const direccion = document.getElementById('direccionReciclador').value.trim();
+  const celular = document.getElementById('celular').value.trim();
+  const tipos = Array.from(document.querySelectorAll("input[name='tipos']:checked")).map(el => el.value);
 
-function salir() {
-  mostrarOpcionesBorrado();
+  if (!empresa || !responsable || !direccion || !celular) {
+    alert("Por favor completa todos los campos");
+    return;
+  }
+
+  const reciclador = { empresa, responsable, direccion, celular, tipos };
+  localStorage.setItem('reciclador', JSON.stringify(reciclador));
+  alert('Reciclador guardado correctamente');
+  volverInicio();
 }
 
 
@@ -139,42 +146,55 @@ function guardarReporte() {
   const cantidad = document.getElementById('cantidad').value;
   const dia = document.getElementById('dia').value;
   const hora = document.getElementById('hora').value;
-  const hogar = JSON.parse(localStorage.getItem('hogar'));
+  const hogar = JSON.parse(localStorage.getItem('hogar')) || {};
 
   let reportes = JSON.parse(localStorage.getItem('reportes')) || [];
-  reportes.push({ direccion: hogar.direccion, tipos, cantidad, dia, hora });
+  reportes.push({
+    barrio: hogar.barrio || "-",
+    direccion: hogar.direccion || "-",
+    tipos,
+    cantidad,
+    dia,
+    hora
+  });
   localStorage.setItem('reportes', JSON.stringify(reportes));
 
-  alert('Reporte guardado y enviado a recicladores');
+  alert('Reporte guardado');
   volverInicio();
 }
 
 
-
 function mostrarRecicladores() {
-  const hogar = JSON.parse(localStorage.getItem("hogar"));
-  const reciclador = JSON.parse(localStorage.getItem("reciclador"));
-
-  if (!hogar || !reciclador) {
-    alert("Debe registrar primero el hogar y el reciclador.");
-    return;
-  }
-
   const reciclajes = JSON.parse(localStorage.getItem("reportes")) || [];
   let html = `<h2>Reportes de Reciclaje</h2>`;
 
   if (reciclajes.length === 0) {
     html += `<p>No hay reportes disponibles.</p>`;
   } else {
-    html += `<table border='1'><tr><th>Dirección</th><th>Tipo</th><th>Cantidad</th><th>Día</th><th>Hora</th><th>Acción</th></tr>`;
+    html += `<table border='1'>
+      <tr>
+        <th>Barrio</th>
+        <th>Dirección</th>
+        <th>Tipo</th>
+        <th>Cantidad</th>
+        <th>Día</th>
+        <th>Hora</th>
+        <th>Acción</th>
+      </tr>`;
     reciclajes.forEach((r, index) => {
       html += `<tr>
-        <td>${r.direccion}</td>
-        <td>${r.tipos.join(", ")}</td>
-        <td>${r.cantidad}</td>
-        <td>${r.dia}</td>
-        <td>${r.hora}</td>
-        <td><button onclick='marcarRecogido(${index})'>Recogido</button></td>
+        <td>${r.barrio || "-"}</td>
+        <td>${r.direccion || "-"}</td>
+        <td>${(r.tipos && r.tipos.join(", ")) || "-"}</td>
+        <td>${r.cantidad || "-"}</td>
+        <td>${r.dia || "-"}</td>
+        <td>${r.hora || "-"}</td>
+        <td>
+          <button onclick='marcarRecogido(${index})'
+            style='background-color: orange; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; min-width: 90px; white-space: nowrap; font-size: 14px;'>
+            Recogido
+          </button>
+        </td>
       </tr>`;
     });
     html += `</table>`;
@@ -185,31 +205,10 @@ function mostrarRecicladores() {
 }
 
 function marcarRecogido(index) {
-    let reciclajes = JSON.parse(localStorage.getItem("reportes")) || [];
-    reciclajes.splice(index, 1);
-    localStorage.setItem("reportes", JSON.stringify(reciclajes));
-    mostrarRecicladores();
-}
-
-
-function guardarReciclador() {
-    const empresa = document.getElementById('empresa').value;
-    const responsable = document.getElementById('responsable').value;
-    const direccion = document.getElementById('direccion').value;
-    const celular = document.getElementById('celular').value;
-    const tipos = Array.from(document.querySelectorAll("input[name='tipos']:checked")).map(el => el.value);
-
-    const reciclador = {
-        empresa,
-        responsable,
-        direccion,
-        celular,
-        tipos
-    };
-
-    localStorage.setItem('reciclador', JSON.stringify(reciclador));
-    alert('Reciclador guardado correctamente');
-    volverInicio();
+  let reciclajes = JSON.parse(localStorage.getItem("reportes")) || [];
+  reciclajes.splice(index, 1);
+  localStorage.setItem("reportes", JSON.stringify(reciclajes));
+  mostrarRecicladores();
 }
 
 
@@ -235,3 +234,10 @@ function borrarReciclaje() {
   volverInicio();
 }
 
+function volverInicio() {
+  document.getElementById('contenido').innerHTML = '';
+}
+
+function salir() {
+  mostrarOpcionesBorrado();
+}

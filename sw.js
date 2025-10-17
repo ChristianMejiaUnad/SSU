@@ -1,4 +1,3 @@
-
 self.addEventListener('install', function(e) {
   e.waitUntil(
     caches.open('reciclaje-store').then(function(cache) {
@@ -20,6 +19,13 @@ self.addEventListener('fetch', function(e) {
   );
 });
 
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(keys.filter(k => k !== 'reciclaje-store').map(k => caches.delete(k)))
+    )
+  );
+});
 
 self.addEventListener('push', function(event) {
   const data = event.data.json();
